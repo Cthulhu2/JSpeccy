@@ -1,7 +1,4 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- *
  * 26/02/2010 Nota al bloque Turbo Mode del formato TZX: algunos programas
  * necesitan empezar con una polaridad concreta. Dos ejemplos son "MASK" y
  * "Basil the Great Mouse Detective". Al resto de programas que he probado eso
@@ -15,32 +12,52 @@
  * es el "Lone Wolf 3", pero da la impresión de que la rutina de carga reiniciable
  * que usa es muy sensible y suele dar problemas en todos los emuladores que he
  * probado. Con un poco de paciencia, acaba por cargar. :)
- * 
+ *
  * 08/04/2012 Añadido el soporte de bloques CALL y RETURN en los TZX. Solo hay un
  * programa que lo necesita (que yo sepa), el Hollywood Poker que está en tzxvault.
- * 
+ *
  */
 package utilities;
 
 import configuration.TapeSettingsType;
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
-import javax.swing.table.AbstractTableModel;
 import machine.Clock;
 import machine.MachineTypes;
 import machine.Memory;
 import z80core.Z80;
 
+import javax.swing.table.AbstractTableModel;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.ResourceBundle;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+
+
 /**
- *
  * @author jsanchez
  */
-public class Tape implements machine.ClockTimeoutListener {
+public class Tape
+        implements machine.ClockTimeoutListener {
+
+    private static final Logger LOG = Logger.getLogger(Tape.class.getName());
+
+    private final ResourceBundle bundle =
+            ResourceBundle.getBundle("utilities/Bundle"); // NOI18N
+
+    private final ResourceBundle guiBundle =
+            ResourceBundle.getBundle("gui/Bundle"); // NOI18N
 
     private Z80 cpu;
     private BufferedInputStream tapeFile;
@@ -49,8 +66,8 @@ public class Tape implements machine.ClockTimeoutListener {
     private ByteArrayInputStream bais;
     private InflaterInputStream iis;
     private File filename;
-    private byte tapeBuffer[];
-    private final int offsetBlocks[] = new int[4096]; // el AMC tiene más de 1500 bloques!!!
+    private byte[] tapeBuffer;
+    private final int[] offsetBlocks = new int[4096]; // el AMC tiene más de 1500 bloques!!!
     private int nOffsetBlocks;
     private int idxHeader;
     private int tapePos;
@@ -62,19 +79,40 @@ public class Tape implements machine.ClockTimeoutListener {
     private final Clock clock;
 
     public enum TapeState {
+        EJECT,
+        INSERT,
+        STOP,
+        PLAY,
+        RECORD
+    }
 
-        EJECT, INSERT, STOP, PLAY, RECORD
-    };
     private final ArrayList<TapeStateListener> stateListeners;
     private final ArrayList<TapeBlockListener> blockListeners;
 
     private enum State {
+        STOP,
+        START,
+        LEADER,
+        LEADER_NOCHG,
+        SYNC,
+        NEWBYTE,
+        NEWBYTE_NOCHG,
+        NEWBIT,
+        HALF2,
+        LAST_PULSE,
+        PAUSE,
+        TZX_HEADER,
+        PURE_TONE,
+        PURE_TONE_NOCHG,
+        PULSE_SEQUENCE,
+        PULSE_SEQUENCE_NOCHG,
+        NEWDR_BYTE,
+        NEWDR_BIT,
+        PAUSE_STOP,
+        CSW_RLE,
+        CSW_ZRLE
+    }
 
-        STOP, START, LEADER, LEADER_NOCHG, SYNC, NEWBYTE,
-        NEWBYTE_NOCHG, NEWBIT, HALF2, LAST_PULSE, PAUSE, TZX_HEADER, PURE_TONE,
-        PURE_TONE_NOCHG, PULSE_SEQUENCE, PULSE_SEQUENCE_NOCHG, NEWDR_BYTE,
-        NEWDR_BIT, PAUSE_STOP, CSW_RLE, CSW_ZRLE
-    };
     private State statePlay;
     private int earBit;
     private boolean micBit;
@@ -82,10 +120,16 @@ public class Tape implements machine.ClockTimeoutListener {
     private static final int EAR_ON = 0xff;
     private static final int EAR_MASK = 0x40;
     private long timeLastOut;
-    private boolean tapePlaying, tapeRecording;
+    private boolean tapePlaying;
+    private boolean tapeRecording;
+
     private enum TapeExtensionType {
-        NO_TAPE, TAP, TZX, CSW
-    };
+        NO_TAPE,
+        TAP,
+        TZX,
+        CSW
+    }
+
     private TapeExtensionType tapeExtension;
     /*
      * Tiempos en T-estados de duración de cada pulso para cada parte de la
@@ -116,11 +160,21 @@ public class Tape implements machine.ClockTimeoutListener {
     private final TapeTableModel tapeTableModel;
     private final TapeSettingsType settings;
     // # of Calls & origin block of TZX CALL block 
-    private int nCalls, callBlk;
+    private int nCalls;
+    private int callBlk;
     // Call sequence for TZX CALL block
     private short[] callSeq;
     // vars for GDB's
-    private int totp, npp, asp, totd, npd, asd, ptrSymbol, ptrDataStream, numPulses, nTotp;
+    private int totp;
+    private int npp;
+    private int asp;
+    private int totd;
+    private int npd;
+    private int asd;
+    private int ptrSymbol;
+    private int ptrDataStream;
+    private int numPulses;
+    private int nTotp;
     private static final String tzxHeader = "ZXTape!\u001A";
     private static final String tzxCreator = "TZX created with JSpeccy v0.94";
     private boolean manualMode = false;
@@ -146,7 +200,6 @@ public class Tape implements machine.ClockTimeoutListener {
      * Adds a new event listener to the list of event listeners.
      *
      * @param listener The new event listener.
-     *
      * @throws NullPointerException Thrown if the listener argument is null.
      */
     public void addTapeChangedListener(final TapeStateListener listener) {
@@ -165,10 +218,9 @@ public class Tape implements machine.ClockTimeoutListener {
      * Remove a new event listener from the list of event listeners.
      *
      * @param listener The event listener to remove.
-     *
-     * @throws NullPointerException Thrown if the listener argument is null.
+     * @throws NullPointerException     Thrown if the listener argument is null.
      * @throws IllegalArgumentException Thrown if the listener wasn't
-     * registered.
+     *                                  registered.
      */
     public void removeTapeChangedListener(final TapeStateListener listener) {
 
@@ -191,7 +243,6 @@ public class Tape implements machine.ClockTimeoutListener {
      * Adds a new event listener to the list of event listeners.
      *
      * @param listener The new event listener.
-     *
      * @throws NullPointerException Thrown if the listener argument is null.
      */
     public void addTapeBlockListener(final TapeBlockListener listener) {
@@ -210,10 +261,9 @@ public class Tape implements machine.ClockTimeoutListener {
      * Remove a new event listener from the list of event listeners.
      *
      * @param listener The event listener to remove.
-     *
-     * @throws NullPointerException Thrown if the listener argument is null.
+     * @throws NullPointerException     Thrown if the listener argument is null.
      * @throws IllegalArgumentException Thrown if the listener wasn't
-     * registered.
+     *                                  registered.
      */
     public void removeTapeBlockListener(final TapeBlockListener listener) {
 
@@ -273,8 +323,6 @@ public class Tape implements machine.ClockTimeoutListener {
     }
 
     private String getBlockType(int block) {
-        java.util.ResourceBundle bundle =
-                java.util.ResourceBundle.getBundle("utilities/Bundle"); // NOI18N
         if (tapeExtension == TapeExtensionType.NO_TAPE) {
             return bundle.getString("NO_TAPE_INSERTED");
         }
@@ -373,16 +421,14 @@ public class Tape implements machine.ClockTimeoutListener {
                 msg = "ZXTape!";
                 break;
             default:
-                msg = String.format(bundle.getString("UNKN_TZX_BLOCK"), tapeBuffer[offset]);
+                msg = String.format(bundle.getString("UNKN_TZX_BLOCK"),
+                        tapeBuffer[offset]);
         }
 
         return msg;
     }
 
     private String getBlockInfo(int block) {
-        java.util.ResourceBundle bundle =
-                java.util.ResourceBundle.getBundle("utilities/Bundle"); // NOI18N
-
         if (tapeExtension == TapeExtensionType.NO_TAPE) {
             return bundle.getString("NO_TAPE_INSERTED");
         }
@@ -398,10 +444,12 @@ public class Tape implements machine.ClockTimeoutListener {
             } else { // CSW v2.0
                 if ((tapeBuffer[0x21] & 0xff) == 0x02) { // Z-RLE encoding
                     return String.format(bundle.getString("CSW2_ZRLE_PULSES"),
-                            readInt(tapeBuffer, 0x1D, 4), readInt(tapeBuffer, 0x19, 4));
+                            readInt(tapeBuffer, 0x1D, 4),
+                            readInt(tapeBuffer, 0x19, 4));
                 } else {
                     return String.format(bundle.getString("CSW2_RLE_PULSES"),
-                            readInt(tapeBuffer, 0x1D, 4), readInt(tapeBuffer, 0x19, 4));
+                            readInt(tapeBuffer, 0x1D, 4),
+                            readInt(tapeBuffer, 0x19, 4));
                 }
             }
         }
@@ -446,7 +494,8 @@ public class Tape implements machine.ClockTimeoutListener {
                 if (tapeBuffer[offset + 4] == 0) { // Header
                     switch (tapeBuffer[offset + 5] & 0xff) {
                         case 0: // Program
-                            msg = String.format(bundle.getString("PROGRAM_HEADER"),
+                            msg = String.format(
+                                    bundle.getString("PROGRAM_HEADER"),
                                     getCleanMsg(offset + 6, 10));
                             break;
                         case 1: // Number array
@@ -456,11 +505,13 @@ public class Tape implements machine.ClockTimeoutListener {
                             msg = bundle.getString("CHAR_ARRAY_HEADER");
                             break;
                         case 3:
-                            msg = String.format(bundle.getString("BYTES_HEADER"),
+                            msg = String.format(
+                                    bundle.getString("BYTES_HEADER"),
                                     getCleanMsg(offset + 6, 10));
                             break;
                         default:
-                            msg = String.format(bundle.getString("UNKN_HEADER_ID"),
+                            msg = String.format(
+                                    bundle.getString("UNKN_HEADER_ID"),
                                     tapeBuffer[offset + 5]);
                     }
                 } else {
@@ -569,7 +620,8 @@ public class Tape implements machine.ClockTimeoutListener {
                 break;
             case 'Z': // TZX Header or "Glue" Block
                 msg = String.format(bundle.getString("TZX_HEADER"),
-                        tapeBuffer[offset + 7] & 0xff, tapeBuffer[offset + 8] & 0xff);
+                        tapeBuffer[offset + 7] & 0xff,
+                        tapeBuffer[offset + 8] & 0xff);
                 break;
             default:
                 msg = "";
@@ -617,7 +669,7 @@ public class Tape implements machine.ClockTimeoutListener {
         try {
             tapeFile = new BufferedInputStream(new FileInputStream(fileName));
         } catch (FileNotFoundException fex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, fex);
+            LOG.log(Level.SEVERE, null, fex);
             return false;
         }
 
@@ -627,7 +679,7 @@ public class Tape implements machine.ClockTimeoutListener {
             tapeFile.close();
             filename = fileName;
         } catch (IOException ex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+            LOG.log(Level.SEVERE, null, ex);
             return false;
         }
 
@@ -668,7 +720,7 @@ public class Tape implements machine.ClockTimeoutListener {
     }
 
     public boolean insertEmbeddedTape(String fileName, String extension,
-            byte[] tapeData, int selectedBlock) {
+                                      byte[] tapeData, int selectedBlock) {
         if (tapeExtension != TapeExtensionType.NO_TAPE) {
             return false;
         }
@@ -1255,7 +1307,8 @@ public class Tape implements machine.ClockTimeoutListener {
                             byte nSamples[] = new byte[4];
                             while (timeout < 4) {
                                 int count = iis.read(nSamples, timeout,
-                                        nSamples.length - timeout);
+                                        nSamples.length - timeout
+                                );
                                 if (count == -1) {
                                     break;
                                 }
@@ -1277,7 +1330,7 @@ public class Tape implements machine.ClockTimeoutListener {
                         clock.setTimeout(timeout);
 
                     } catch (IOException ex) {
-                        Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+                        LOG.log(Level.SEVERE, null, ex);
                     }
                     break;
 //                case GDB_PULSE_SYNC:
@@ -1556,7 +1609,8 @@ public class Tape implements machine.ClockTimeoutListener {
 
             for (int pulse = 0; pulse < totp; pulse++) {
                 System.out.println(String.format("\t\tRepeat %d: symbol %d repeated %d times",
-                        pulse, tapeBuffer[offset++] & 0xff, readInt(tapeBuffer, offset, 2)));
+                        pulse, tapeBuffer[offset++] & 0xff, readInt(tapeBuffer, offset, 2)
+                ));
                 offset += 2;
             }
         }
@@ -1598,7 +1652,8 @@ public class Tape implements machine.ClockTimeoutListener {
                     tapePos = 0x34 + tapeBuffer[0x23];
                     if ((tapeBuffer[0x21] & 0xff) == 0x02) { // Z-RLE
                         bais = new ByteArrayInputStream(tapeBuffer, tapePos,
-                                tapeBuffer.length - tapePos);
+                                tapeBuffer.length - tapePos
+                        );
                         iis = new InflaterInputStream(bais);
                         statePlay = State.CSW_ZRLE;
                         clock.setTimeout(1);
@@ -1607,7 +1662,7 @@ public class Tape implements machine.ClockTimeoutListener {
                         statePlay = State.CSW_RLE;
                     }
                 }
-            // No break statement, that's correct. :)
+                // No break statement, that's correct. :)
             case CSW_RLE:
                 if (tapePos == tapeBuffer.length) {
                     stop();
@@ -1640,7 +1695,8 @@ public class Tape implements machine.ClockTimeoutListener {
                         byte nSamples[] = new byte[4];
                         while (timeout < 4) {
                             int count = iis.read(nSamples, timeout,
-                                    nSamples.length - timeout);
+                                    nSamples.length - timeout
+                            );
                             if (count == -1) {
                                 break;
                             }
@@ -1838,10 +1894,8 @@ public class Tape implements machine.ClockTimeoutListener {
         try {
             fOut = new BufferedOutputStream(new FileOutputStream(filename, true));
             record.writeTo(fOut);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+            LOG.log(Level.SEVERE, null, ex);
         } finally {
             try {
                 record.close();
@@ -1849,7 +1903,7 @@ public class Tape implements machine.ClockTimeoutListener {
                     fOut.close();
                 }
             } catch (IOException ex) {
-                Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+                LOG.log(Level.SEVERE, null, ex);
             }
         }
 
@@ -1942,17 +1996,15 @@ public class Tape implements machine.ClockTimeoutListener {
                 record.close();
                 record.writeTo(fOut);
             }
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
-            Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+            LOG.log(Level.SEVERE, null, ex);
         } finally {
             try {
                 if (fOut != null) {
                     fOut.close();
                 }
             } catch (IOException ex) {
-                Logger.getLogger(Tape.class.getName()).log(Level.SEVERE, null, ex);
+                LOG.log(Level.SEVERE, null, ex);
             }
         }
 
@@ -2013,7 +2065,8 @@ public class Tape implements machine.ClockTimeoutListener {
         micBit = micState;
     }
 
-    private class TapeTableModel extends AbstractTableModel {
+    private class TapeTableModel
+            extends AbstractTableModel {
 
         public TapeTableModel() {
         }
@@ -2050,20 +2103,17 @@ public class Tape implements machine.ClockTimeoutListener {
 
         @Override
         public String getColumnName(int col) {
-            java.util.ResourceBundle bundle =
-                    java.util.ResourceBundle.getBundle("gui/Bundle"); // NOI18N
-
             String msg;
 
             switch (col) {
                 case 0:
-                    msg = bundle.getString("JSpeccy.tapeCatalog.columnModel.title0");
+                    msg = guiBundle.getString("JSpeccy.tapeCatalog.columnModel.title0");
                     break;
                 case 1:
-                    msg = bundle.getString("JSpeccy.tapeCatalog.columnModel.title1");
+                    msg = guiBundle.getString("JSpeccy.tapeCatalog.columnModel.title1");
                     break;
                 case 2:
-                    msg = bundle.getString("JSpeccy.tapeCatalog.columnModel.title2");
+                    msg = guiBundle.getString("JSpeccy.tapeCatalog.columnModel.title2");
                     break;
                 default:
                     msg = "COLUMN ERROR!";

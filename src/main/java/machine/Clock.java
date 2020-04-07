@@ -1,17 +1,14 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
 
 import java.util.ConcurrentModificationException;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+
 /**
- *
  * @author jsanchez
  */
 public class Clock {
+
     private static final Clock instance = new Clock();
     private MachineTypes spectrumModel = MachineTypes.SPECTRUM48K;
     private int tstates;
@@ -27,11 +24,11 @@ public class Clock {
     public static Clock getInstance() {
         return instance;
     }
+
     /**
      * Adds a new event listener to the list of event listeners.
      *
      * @param listener The new event listener.
-     *
      * @throws NullPointerException Thrown if the listener argument is null.
      */
     public void addClockTimeoutListener(final ClockTimeoutListener listener) {
@@ -50,8 +47,7 @@ public class Clock {
      * Remove a new event listener from the list of event listeners.
      *
      * @param listener The event listener to remove.
-     *
-     * @throws NullPointerException Thrown if the listener argument is null.
+     * @throws NullPointerException     Thrown if the listener argument is null.
      * @throws IllegalArgumentException Thrown if the listener wasn't registered.
      */
     public void removeClockTimeoutListener(final ClockTimeoutListener listener) {
@@ -63,7 +59,7 @@ public class Clock {
         if (!clockListeners.remove(listener)) {
             throw new IllegalArgumentException("Internal Error: Listener was not listening on object");
         }
-        
+
         // When don't have listeners, disable any pending timeout
         if (clockListeners.isEmpty()) {
             timeout = 0;
@@ -89,10 +85,11 @@ public class Clock {
      * @param states the tstates to set
      */
     public void setTstates(int states) {
-        if (states < 0 || states > spectrumModel.tstatesFrame)
+        if (states < 0 || states > spectrumModel.tstatesFrame) {
             tstates = 0;
-        else
+        } else {
             tstates = states;
+        }
         frames = timeout = 0;
     }
 
@@ -105,9 +102,9 @@ public class Clock {
             if (timeout <= 0) {
                 int res = timeout;
                 for (final ClockTimeoutListener listener : clockListeners) {
-                   listener.clockTimeout();
+                    listener.clockTimeout();
                 }
-                
+
                 if (timeout > 0) {
 //                    System.out.println("Timeout: " + timeout + " res: " + res);
                     timeout += res;
@@ -139,7 +136,7 @@ public class Clock {
         }
 
         timeout = ntstates > 10 ? ntstates : 10;
-    } 
+    }
 
     @Override
     public String toString() {

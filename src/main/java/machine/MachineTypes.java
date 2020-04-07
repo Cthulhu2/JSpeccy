@@ -1,11 +1,6 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
 
 /**
- *
  * @author jsanchez
  */
 public enum MachineTypes {
@@ -17,10 +12,15 @@ public enum MachineTypes {
     SPECTRUMPLUS2A(4),
     SPECTRUMPLUS3(5);
 
-    static public enum CodeModel { SPECTRUM48K, SPECTRUM128K, SPECTRUMPLUS3 };
+    public enum CodeModel {
+        SPECTRUM48K,
+        SPECTRUM128K,
+        SPECTRUMPLUS3
+    }
+
     public CodeModel codeModel; // Código de modelo
-    private String longModelName;   // Nombre largo del modelo de Spectrum
-    private String shortModelName;   // Nombre corto del modelo de Spectrum
+    private String longModelName; // Nombre largo del modelo de Spectrum
+    private String shortModelName; // Nombre corto del modelo de Spectrum
     public int clockFreq;       // Clock frequency
     public int tstatesFrame;    // t-states por cuadro de la imagen
     public int tstatesLine;     // t-states por línea de imagen

@@ -1,11 +1,8 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
 
 import configuration.JSpeccySettings;
 import configuration.MemoryType;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -14,16 +11,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import snapshots.MemoryState;
 import tv.porst.jhexview.IDataChangedListener;
 
 /**
- *
  * @author jsanchez
  */
 public final class Memory {
+
+    private static final Logger LOG = Logger.getLogger(Memory.class.getName());
+
+    private final ResourceBundle bundle =
+            ResourceBundle.getBundle("machine/Bundle");
 
     private final int PAGE_SIZE = 0x2000;
     private final byte[][] Rom48k = new byte[2][PAGE_SIZE];
@@ -51,10 +54,18 @@ public final class Memory {
     private byte[][] lecRam;
     // Número de página de RAM de donde sale la pantalla activa
     private int screenPage;
-    private int highPage, bankM, bankP, portFD, activePageLEC;
-    private boolean IF1RomPaged, IF2RomPaged;
-    private boolean model128k, pagingLocked, plus3RamMode;
-    private boolean multifacePaged, multifaceLocked;
+    private int highPage;
+    private int bankM;
+    private int bankP;
+    private int portFD;
+    private int activePageLEC;
+    private boolean IF1RomPaged;
+    private boolean IF2RomPaged;
+    private boolean model128k;
+    private boolean pagingLocked;
+    private boolean plus3RamMode;
+    private boolean multifacePaged;
+    private boolean multifaceLocked;
     private MachineTypes spectrumModel;
     private final JSpeccySettings settings;
     private final Random random;
@@ -110,7 +121,7 @@ public final class Memory {
 
         return state;
     }
-    
+
     public void setMemoryState(MemoryState state) {
 
         if (IF2RomPaged) {
@@ -129,7 +140,7 @@ public final class Memory {
                     setConnectedLEC(true);
                     for (int page = 0; page < 16; page++) {
                         loadPageLec(page, state.getLecPageRam(page));
-                 }
+                    }
                 } else {
                     setConnectedLEC(false);
                 }
@@ -161,7 +172,7 @@ public final class Memory {
             pageIF1Rom();
         }
     }
-    
+
     public byte readScreenByte(int address) {
         return Ram[screenPage][address];
     }
@@ -350,7 +361,7 @@ public final class Memory {
         model128k = true;
         bankM = 0;
     }
-    
+
     private void setMemoryMapPlus3() {
         if (spectrumModel == MachineTypes.SPECTRUMPLUS3) {
             readPages[0] = RomPlus3[0];
@@ -439,7 +450,7 @@ public final class Memory {
                 doPagingPlus3();
                 break;
         }
-        
+
         // Set the page locking state
         pagingLocked = (port7ffd & 0x20) != 0;
     }
@@ -620,13 +631,13 @@ public final class Memory {
             case 6: // Address 0xc000-0xdfff
                 return (addr < 0xDB00 && (highPage << 1) == screenPage);
         }
-        
+
         return false;
     }
 
     public boolean isScreenByteModified(int address, byte value) {
         return (readPages[address >>> 13][address & 0x1fff] != value
-            && isScreenByte(address));
+                && isScreenByte(address));
     }
 
     public boolean isModel128k() {
@@ -643,13 +654,13 @@ public final class Memory {
 
         if (spectrumModel != model) {
             spectrumModel = model;
-            
+
             for (byte[] Ram1 : Ram) {
                 random.nextBytes(Ram1);
             }
             random.nextBytes(mfRAM);
         }
-        
+
         switch (spectrumModel) {
             case SPECTRUM16K:
                 setMemoryMap16k();
@@ -936,27 +947,27 @@ public final class Memory {
     public boolean isIF1RomPaged() {
         return IF1RomPaged;
     }
-    
+
     public void setConnectedLEC(boolean state) {
         if (state && lecRam != null) {
             return;
         }
-        
+
         if (state) {
             lecRam = new byte[64][];
-                for (int page = 0; page < 60; page++) {
-                    lecRam[page] = new byte[PAGE_SIZE];
-                }
+            for (int page = 0; page < 60; page++) {
+                lecRam[page] = new byte[PAGE_SIZE];
+            }
 
-                lecRam[60] = Ram[4]; // Page 2
-                lecRam[61] = Ram[5];
-                lecRam[62] = Ram[0]; // Page 0
-                lecRam[63] = Ram[1];
+            lecRam[60] = Ram[4]; // Page 2
+            lecRam[61] = Ram[5];
+            lecRam[62] = Ram[0]; // Page 0
+            lecRam[63] = Ram[1];
         } else {
             lecRam = null;
         }
     }
-    
+
     public boolean isConnectedLEC() {
         return lecRam != null;
     }
@@ -1056,7 +1067,7 @@ public final class Memory {
         if (!loadRomAsFile(romsDirectory + conf.getRomPlus2A3(), RomPlus2a, 6, PAGE_SIZE * 2)) {
             loadRomAsResource("/roms/plus2a-3.rom", RomPlus2a, 6, PAGE_SIZE * 2);
         }
-        
+
         if (!loadRomAsFile(romsDirectory + conf.getRomPlus30(), RomPlus3, 0, PAGE_SIZE * 2)) {
             loadRomAsResource("/roms/plus3-0.rom", RomPlus3, 0, PAGE_SIZE * 2);
         }
@@ -1087,9 +1098,7 @@ public final class Memory {
         boolean res = false;
 
         if (inRom == null) {
-            String msg =
-                java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                "RESOURCE_ROM_ERROR");
+            String msg = bundle.getString("RESOURCE_ROM_ERROR");
             System.out.println(String.format("%s: %s", msg, filename));
             return false;
         }
@@ -1102,18 +1111,14 @@ public final class Memory {
                 }
 
                 if (count != PAGE_SIZE) {
-                    String msg =
-                        java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                        "ROM_SIZE_ERROR");
+                    String msg = bundle.getString("ROM_SIZE_ERROR");
                     System.out.println(String.format("%s: %s", msg, filename));
                 } else {
                     res = true;
                 }
             }
         } catch (IOException ex) {
-            String msg =
-                java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                "RESOURCE_ROM_ERROR");
+            String msg = bundle.getString("RESOURCE_ROM_ERROR");
             System.out.println(String.format("%s: %s", msg, filename));
             Logger.getLogger(Spectrum.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
@@ -1125,9 +1130,7 @@ public final class Memory {
         }
 
         if (res) {
-            String msg =
-                java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                "ROM_RESOURCE_LOADED");
+            String msg = bundle.getString("ROM_RESOURCE_LOADED");
             System.out.println(String.format("%s: %s", msg, filename));
         }
 
@@ -1142,9 +1145,7 @@ public final class Memory {
             try {
                 fIn = new BufferedInputStream(new FileInputStream(filename));
             } catch (FileNotFoundException ex) {
-                String msg =
-                    java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                    "FILE_ROM_ERROR");
+                String msg = bundle.getString("FILE_ROM_ERROR");
                 System.out.println(String.format("%s: %s", msg, filename));
                 //Logger.getLogger(Spectrum.class.getName()).log(Level.SEVERE, null, ex);
                 return false;
@@ -1157,18 +1158,14 @@ public final class Memory {
                 }
 
                 if (count != PAGE_SIZE) {
-                    String msg =
-                        java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                        "ROM_SIZE_ERROR");
+                    String msg = bundle.getString("ROM_SIZE_ERROR");
                     System.out.println(String.format("%s: %s", msg, filename));
                 } else {
                     res = true;
                 }
             }
         } catch (IOException ex) {
-            String msg =
-                java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                "FILE_ROM_ERROR");
+            String msg = bundle.getString("FILE_ROM_ERROR");
             System.out.println(String.format("%s: %s", msg, filename));
             Logger.getLogger(Spectrum.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
@@ -1182,9 +1179,7 @@ public final class Memory {
         }
 
         if (res) {
-            String msg =
-                java.util.ResourceBundle.getBundle("machine/Bundle").getString(
-                "ROM_FILE_LOADED");
+            String msg = bundle.getString("ROM_FILE_LOADED");
             System.out.println(String.format("%s: %s", msg, filename));
         }
 
@@ -1225,35 +1220,39 @@ public final class Memory {
             }
 
         } catch (IOException ex) {
-            Logger.getLogger(Memory.class.getName()).log(Level.SEVERE, null, ex);
+            LOG.log(Level.SEVERE, null, ex);
         } finally {
             try {
-                if (fIn != null)
+                if (fIn != null) {
                     fIn.close();
+                }
             } catch (IOException ex) {
-                Logger.getLogger(Memory.class.getName()).log(Level.SEVERE, null, ex);
+                LOG.log(Level.SEVERE, null, ex);
             }
         }
 
         return true;
     }
-    
+
     private int pageModeBrowser = 0;  // RAM Page = 0-7, Lineal Mode >= 8
+
     public void setPageModeBrowser(int page) {
         pageModeBrowser = page;
     }
-    
+
     private MemoryDataProvider memoryDataProvider;
+
     public MemoryDataProvider getMemoryDataProvider() {
-        
+
         if (memoryDataProvider == null) {
-            memoryDataProvider =  new MemoryDataProvider();
+            memoryDataProvider = new MemoryDataProvider();
         }
 
         return memoryDataProvider;
     }
 
-    private class MemoryDataProvider implements tv.porst.jhexview.IDataProvider {
+    private class MemoryDataProvider
+            implements tv.porst.jhexview.IDataProvider {
         // Interface implementation for JHexView
 
         @Override

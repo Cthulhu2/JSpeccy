@@ -1,34 +1,41 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
+
+import joystickinput.JoystickRaw;
 
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Arrays;
-import joystickinput.JoystickRaw;
+
 
 /**
- *
  * @author jsanchez
  */
-public class Keyboard implements KeyListener {
+public class Keyboard
+        implements KeyListener {
 
-    public static enum JoystickModel {
+    public enum JoystickModel {
+        NONE,
+        KEMPSTON,
+        SINCLAIR1,
+        SINCLAIR2,
+        CURSOR,
+        FULLER
+    }
 
-        NONE, KEMPSTON, SINCLAIR1, SINCLAIR2, CURSOR, FULLER
-    };
-    
-    private final int rowKey[] = new int[8];
-    private int sjs1, sjs2;
-    private boolean shiftPressed, mapPCKeys;
+    private final int[] rowKey = new int[8];
+    private int sjs1;
+    private int sjs2;
+    private boolean shiftPressed;
+    private boolean mapPCKeys;
     private final boolean winBug;
-    private final KeyEvent keyEventPending[] = new KeyEvent[8];
-    private int kempston, fuller;
-    private JoystickModel joystickModel, shadowJoystick;
-    private final JoystickRaw joystick1, joystick2;
+    private final KeyEvent[] keyEventPending = new KeyEvent[8];
+    private int kempston;
+    private int fuller;
+    private JoystickModel joystickModel;
+    private JoystickModel shadowJoystick;
+    private final JoystickRaw joystick1;
+    private final JoystickRaw joystick2;
 
     /*
      * Spectrum Keyboard Map
@@ -51,7 +58,7 @@ public class Keyboard implements KeyListener {
      * -----------------------------------------
      * 127 (7Fh)    B   N   M   SYM BREAK/SPACE
      * -----------------------------------------
-     * 
+     *
      */
     private static final int KEY_PRESSED_BIT0 = 0xfe;
     private static final int KEY_PRESSED_BIT1 = 0xfd;
@@ -91,14 +98,14 @@ public class Keyboard implements KeyListener {
     public final JoystickModel getJoystickModel() {
         return joystick1 == null ? joystickModel : shadowJoystick;
     }
-    
+
     public final void setJoystickModel(JoystickModel model) {
         kempston = 0;
         sjs1 = sjs2 = fuller = 0xff;
 
         if (joystick1 != null) {
             shadowJoystick = model;
-            
+
             switch (shadowJoystick) {
                 case SINCLAIR1:
                     joystickModel = joystick2 == null ? JoystickModel.SINCLAIR2 : JoystickModel.NONE;
@@ -114,7 +121,7 @@ public class Keyboard implements KeyListener {
             shadowJoystick = JoystickModel.NONE;
         }
     }
-    
+
     public final void setJoystickModel(int model) {
         switch (model) {
             case 1:
@@ -217,8 +224,9 @@ public class Keyboard implements KeyListener {
         }
 
         int state = joystick1.getButtonMask();
-        if (state == 0)
+        if (state == 0) {
             return 0xff;
+        }
 
         int buttons = 0xff;
         if ((state & 0x20) != 0) {
@@ -242,8 +250,9 @@ public class Keyboard implements KeyListener {
     private void joystickToSJS1(int state) {
         sjs1 = 0xff;
 
-        if (state == 0)
+        if (state == 0) {
             return;
+        }
 
         if ((state & 0x80) != 0) {
             sjs1 &= KEY_PRESSED_BIT4; // Sinclair 2 Left (6)
@@ -261,12 +270,13 @@ public class Keyboard implements KeyListener {
             sjs1 &= KEY_PRESSED_BIT0; // Sinclair 2 Fire (0)
         }
     }
-    
+
     private void joystickToSJS2(int state) {
         sjs2 = 0xff;
-        
-        if (state == 0)
+
+        if (state == 0) {
             return;
+        }
 
         if ((state & 0x80) != 0) {
             sjs2 &= KEY_PRESSED_BIT0; // Sinclair 1 Left (1)
@@ -284,14 +294,15 @@ public class Keyboard implements KeyListener {
             sjs2 &= KEY_PRESSED_BIT4; // Sinclair 1 Fire (5)
         }
     }
-    
+
     private void joystickToCursor() {
         sjs1 = sjs2 = 0xff;
 
         int state = joystick1.getButtonMask();
-        if (state == 0)
+        if (state == 0) {
             return;
-        
+        }
+
         if ((state & 0x80) != 0) {
             sjs2 &= KEY_PRESSED_BIT4; // Cursor Left (5)
         }
@@ -320,20 +331,25 @@ public class Keyboard implements KeyListener {
         if (mapJoysticks && joystick1 != null) {
             switch (shadowJoystick) {
                 case KEMPSTON:
-                    if (joystick2 != null && res == 0xef)
+                    if (joystick2 != null && res == 0xef) {
                         joystickToSJS1(joystick2.getButtonMask());
+                    }
                     break;
                 case SINCLAIR1:
-                    if (res == 0xef)
+                    if (res == 0xef) {
                         joystickToSJS1(joystick1.getButtonMask());
-                    if (joystick2 != null && res == 0xf7)
+                    }
+                    if (joystick2 != null && res == 0xf7) {
                         joystickToSJS2(joystick2.getButtonMask());
+                    }
                     break;
                 case SINCLAIR2:
-                    if (res == 0xf7)
+                    if (res == 0xf7) {
                         joystickToSJS2(joystick1.getButtonMask());
-                    if (joystick2 != null && res == 0xef)
+                    }
+                    if (joystick2 != null && res == 0xef) {
                         joystickToSJS1(joystick2.getButtonMask());
+                    }
                     break;
                 case CURSOR:
                     joystickToCursor();
@@ -372,7 +388,7 @@ public class Keyboard implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent evt) {
-        
+
         if (mapPCKeys) {
             char keychar = evt.getKeyChar();
             if (keychar != KeyEvent.CHAR_UNDEFINED && !evt.isAltDown()) {
@@ -391,35 +407,37 @@ public class Keyboard implements KeyListener {
         }
 
         int key = evt.getKeyCode();
-        
+
 //        System.out.println(String.format("Press keyCode = %d, modifiers = %d", key, evt.getModifiersEx()));
 
         /*
          * Windows no envía el keycode VK_ALT_GRAPH y en su lugar envía dos eventos, Ctrl + Alt, en ese orden.
          * Además, una repetición de tecla consiste en múltiples eventos keyPressed y un solo evento keyReleased.
-         * 
+         *
          * El Ctrl es una pulsación normal y el Alt lleva activos los modificadores CTRL y ALT.
-         * 
+         *
          * El problema es que el primer Ctrl nos "presiona" la tecla Symbol-Shift, y hay que quitarla.
-         * 
+         *
          * En cualquier otro caso, la tecla Alt hay que saltársela para que sigan funcionando los
          * atajos de teclado sin producir pulsaciones espureas en el emulador.
-         * 
+         *
          * Además, una repetición de tecla consiste en múltiples eventos keyPressed y un solo evento keyReleased.
-         * 
+         *
          * Algunos teclados de Windows no tienen AltGr sino un Alt derecho. Shit yourself, little parrot!.
          */
-        if (winBug && key == KeyEvent.VK_ALT && (evt.getModifiersEx() == (InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK)
+        if (winBug && key == KeyEvent.VK_ALT
+                && (evt.getModifiersEx() == (InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK)
                 || evt.getKeyLocation() == KeyEvent.KEY_LOCATION_RIGHT)) {
             key = KeyEvent.VK_ALT_GRAPH;
             rowKey[7] |= KEY_RELEASED_BIT1; // Symbol Shift
         } else {
             // En caso de ser Windows, si se reciben Alt + Control probablemente lo que se pulsó fue AltGr
             // Gracias a pastbytes por detectar (también) este problema e indicarme la manera de reproducirlo.
-            if (evt.isAltDown() && !evt.isControlDown())
+            if (evt.isAltDown() && !evt.isControlDown()) {
                 return;
+            }
         }
-        
+
         switch (key) {
             // Row B - Break/Space
             case KeyEvent.VK_SPACE:
@@ -552,8 +570,9 @@ public class Keyboard implements KeyListener {
                 break;
             // Additional keys
             case KeyEvent.VK_BACK_SPACE:
-                if (!shiftPressed)
+                if (!shiftPressed) {
                     rowKey[0] &= KEY_PRESSED_BIT0; // CAPS
+                }
                 rowKey[4] &= KEY_PRESSED_BIT0; // 0
                 break;
             case KeyEvent.VK_COMMA:
@@ -587,21 +606,24 @@ public class Keyboard implements KeyListener {
                 rowKey[5] &= KEY_PRESSED_BIT1; // O
                 break;
             case KeyEvent.VK_CAPS_LOCK:
-                if (!shiftPressed)
+                if (!shiftPressed) {
                     rowKey[0] &= KEY_PRESSED_BIT0; // CAPS
+                }
                 rowKey[3] &= KEY_PRESSED_BIT1; // 2  -- Caps Lock
                 break;
             case KeyEvent.VK_ESCAPE:
-                if (!shiftPressed)
+                if (!shiftPressed) {
                     rowKey[0] &= KEY_PRESSED_BIT0; // Caps Shift
+                }
                 rowKey[7] &= KEY_PRESSED_BIT0; // Space
                 break;
             // Joystick emulation
             case KeyEvent.VK_LEFT:
                 switch (joystickModel) {
                     case NONE:
-                        if (!shiftPressed)
+                        if (!shiftPressed) {
                             rowKey[0] &= KEY_PRESSED_BIT0; // Caps
+                        }
                     case CURSOR:
                         rowKey[3] &= KEY_PRESSED_BIT4; // 5  -- Left arrow
                         break;
@@ -622,8 +644,9 @@ public class Keyboard implements KeyListener {
             case KeyEvent.VK_DOWN:
                 switch (joystickModel) {
                     case NONE:
-                        if (!shiftPressed)
+                        if (!shiftPressed) {
                             rowKey[0] &= KEY_PRESSED_BIT0; // Caps
+                        }
                     case CURSOR:
                         rowKey[4] &= KEY_PRESSED_BIT4; // 6  -- Down arrow
                         break;
@@ -644,8 +667,9 @@ public class Keyboard implements KeyListener {
             case KeyEvent.VK_UP:
                 switch (joystickModel) {
                     case NONE:
-                        if (!shiftPressed)
+                        if (!shiftPressed) {
                             rowKey[0] &= KEY_PRESSED_BIT0; // Caps
+                        }
                     case CURSOR:
                         rowKey[4] &= KEY_PRESSED_BIT3; // 7  -- Up arrow
                         break;
@@ -666,8 +690,9 @@ public class Keyboard implements KeyListener {
             case KeyEvent.VK_RIGHT:
                 switch (joystickModel) {
                     case NONE:
-                        if (!shiftPressed)
+                        if (!shiftPressed) {
                             rowKey[0] &= KEY_PRESSED_BIT0; // Caps
+                        }
                     case CURSOR:
                         rowKey[4] &= KEY_PRESSED_BIT2; // 8  -- Right arrow
                         break;
@@ -710,7 +735,7 @@ public class Keyboard implements KeyListener {
 
     @Override
     public void keyReleased(KeyEvent evt) {
-        
+
         if (mapPCKeys) {
             char keychar = evt.getKeyChar();
 
@@ -730,31 +755,32 @@ public class Keyboard implements KeyListener {
                 }
             }
         }
-        
+
         int key = evt.getKeyCode();
-        
+
 //        System.out.println(String.format("Release keyCode = %d, modifiers = %d", key, evt.getModifiersEx()));
 
         /*
          * Windows no envía el keycode VK_ALT_GRAPH y en su lugar envía dos eventos, Ctrl + Alt, en ese orden.
-         * 
+         *
          * El Ctrl lleva activo el modificador Alt. El Alt es un evento normal.
-         * 
+         *
          * La tecla Alt hay que saltársela para que sigan funcionando los atajos de teclado sin
          * producir pulsaciones espureas en el emulador.
-         * 
+         *
          * Además, una repetición de tecla consiste en múltiples eventos keyPressed y un solo evento keyReleased.
-         * 
+         *
          * Algunos teclados de Windows no tienen AltGr sino un Alt derecho. Shit yourself, little parrot!.
          */
         if (winBug && ((key == KeyEvent.VK_CONTROL && evt.getModifiersEx() == InputEvent.ALT_DOWN_MASK)
                 || (key == KeyEvent.VK_ALT && evt.getKeyLocation() == KeyEvent.KEY_LOCATION_RIGHT))) {
             key = KeyEvent.VK_ALT_GRAPH;
         } else {
-            if (evt.isAltDown() && !evt.isControlDown())
+            if (evt.isAltDown() && !evt.isControlDown()) {
                 return;
+            }
         }
-        
+
         switch (key) {
             // Row Break/Space - B
             case KeyEvent.VK_SPACE:

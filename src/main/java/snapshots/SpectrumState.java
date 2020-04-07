@@ -1,34 +1,42 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package snapshots;
 
 import machine.Keyboard.JoystickModel;
 import machine.MachineTypes;
 
+
 /**
- *
  * @author jsanchez
  */
 public class SpectrumState {
+
     private MachineTypes spectrumModel;
     private Z80State z80;
     private MemoryState memory;
     private AY8912State ay8912;
-    private int tstates, portFE, earBit, port7ffd, port1ffd, portFD;
+    private int tstates;
+    private int portFE;
+    private int earBit;
+    private int port7ffd;
+    private int port1ffd;
+    private int portFD;
     private byte numMicrodrives = 1;
-    private boolean ULAPlusEnabled, ULAPlusActive, issue2, multiface, connectedLec;
-    private boolean connectedIF1, enabledAY, enabledAYon48k;
+    private boolean ULAPlusEnabled;
+    private boolean ULAPlusActive;
+    private boolean issue2;
+    private boolean multiface;
+    private boolean connectedLec;
+    private boolean connectedIF1;
+    private boolean enabledAY;
+    private boolean enabledAYon48k;
     private JoystickModel joystick;
     // Color palette
-    private int ULAPlusPalette[];
+    private int[] ULAPlusPalette;
     // Palette group
     private int paletteGroup;
-    
-    public SpectrumState () {
+
+    public SpectrumState() {
     }
-    
+
     /**
      * @return the spectrumModel
      */
@@ -191,7 +199,7 @@ public class SpectrumState {
     }
 
     /**
-     * @param ULAPlusPalette the UlaPlusPalette to set
+     * @param UlaPlusPalette the UlaPlusPalette to set
      */
     public void setULAPlusPalette(int[] UlaPlusPalette) {
         this.ULAPlusPalette = UlaPlusPalette;
@@ -250,9 +258,10 @@ public class SpectrumState {
      * @param numMicrodrives the numMicrodrives to set
      */
     public void setNumMicrodrives(byte numMicrodrives) {
-        if (numMicrodrives < 1 || numMicrodrives > 8)
+        if (numMicrodrives < 1 || 8 < numMicrodrives) {
             numMicrodrives = 8;
-        
+        }
+
         this.numMicrodrives = numMicrodrives;
     }
 
@@ -283,7 +292,7 @@ public class SpectrumState {
     public void setPortFE(int portFE) {
         this.portFE = portFE;
     }
-    
+
     /**
      * @return the border colour
      */
@@ -292,7 +301,7 @@ public class SpectrumState {
     }
 
     /**
-     * @param portFE the border colour
+     * @param color the border colour
      */
     public void setBorder(int color) {
         portFE &= 0xF8;

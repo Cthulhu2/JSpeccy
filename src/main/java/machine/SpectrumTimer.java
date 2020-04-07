@@ -1,16 +1,13 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
 
 import java.util.TimerTask;
 
+
 /**
- *
  * @author jsanchez
  */
-public class SpectrumTimer extends TimerTask {
+public class SpectrumTimer
+        extends TimerTask {
 
     private final Spectrum spectrum;
 
@@ -27,9 +24,10 @@ public class SpectrumTimer extends TimerTask {
         // retrasados para que no se acumulen en el sistema.
 //        long now = System.currentTimeMillis();
 //        System.out.println("Tick delayed: " + (now - scheduledExecutionTime()) + " at frame " + Clock.getInstance().getFrames());
-        if (System.currentTimeMillis() - scheduledExecutionTime() < 100)
-            synchronized(spectrum) {
+        if (System.currentTimeMillis() - scheduledExecutionTime() < 100) {
+            synchronized (spectrum) {
                 spectrum.notify();
             }
+        }
     }
 }

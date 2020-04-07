@@ -1,14 +1,11 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package machine;
 
-import java.util.Arrays;
 import snapshots.AY8912State;
 
+import java.util.Arrays;
+
+
 /**
- *
  * @author jsanchez
  */
 public final class AY8912 {
@@ -43,14 +40,23 @@ public final class AY8912 {
     private static final int ATTACK = 0x04;
     private static final int CONTINUE = 0x08;
     // Channel periods
-    private int periodA, periodB, periodC, periodN;
+    private int periodA;
+    private int periodB;
+    private int periodC;
+    private int periodN;
     // Channel period counters
-    private int counterA, counterB, counterC;
+    private int counterA;
+    private int counterB;
+    private int counterC;
     // Channel amplitudes
-    private int amplitudeA, amplitudeB, amplitudeC;
+    private int amplitudeA;
+    private int amplitudeB;
+    private int amplitudeC;
     // Noise counter & noise seed
-    private int counterN, rng;
-    private int envelopePeriod, envelopeCounter;
+    private int counterN;
+    private int rng;
+    private int envelopePeriod;
+    private int envelopeCounter;
 
     /* Envelope shape cycles:
      C AtAlH
@@ -83,13 +89,13 @@ public final class AY8912 {
     // AY register index
     private int addressLatch;
     // AY register set
-    private final int regAY[] = new int[16];
+    private final int[] regAY = new int[16];
     // Output signal levels (thanks to Matthew Westcott)
     // http://groups.google.com/group/comp.sys.sinclair/browse_thread/thread/
     // fb3091da4c4caf26/d5959a800cda0b5e?lnk=gst&q=Matthew+Westcott#d5959a800cda0b5e
     private static final double volumeRate[] = {
-        0.0000, 0.0137, 0.0205, 0.0291, 0.0423, 0.0618, 0.0847, 0.1369,
-        0.1691, 0.2647, 0.3527, 0.4499, 0.5704, 0.6873, 0.8482, 1.0000
+            0.0000, 0.0137, 0.0205, 0.0291, 0.0423, 0.0618, 0.0847, 0.1369,
+            0.1691, 0.2647, 0.3527, 0.4499, 0.5704, 0.6873, 0.8482, 1.0000
     };
     // Real (for the soundcard) volume levels
     private final int[] volumeLevel = new int[16];
@@ -98,16 +104,29 @@ public final class AY8912 {
     private int[] bufC;
     private int pbuf;
     private int FREQ;
-    private long step, stepCounter;
+    private long step;
+    private long stepCounter;
     private double stepRate;
     // Tone channel levels
-    private boolean toneA, toneB, toneC, toneN;
-    private boolean disableToneA, disableToneB, disableToneC;
-    private boolean disableNoiseA, disableNoiseB, disableNoiseC;
-    private boolean envA, envB, envC;
-    private int volumeA, volumeB, volumeC;
-//    private int lastA, lastB, lastC;
-    private int audiotstates, samplesPerFrame;
+    private boolean toneA;
+    private boolean toneB;
+    private boolean toneC;
+    private boolean toneN;
+    private boolean disableToneA;
+    private boolean disableToneB;
+    private boolean disableToneC;
+    private boolean disableNoiseA;
+    private boolean disableNoiseB;
+    private boolean disableNoiseC;
+    private boolean envA;
+    private boolean envB;
+    private boolean envC;
+    private int volumeA;
+    private int volumeB;
+    private int volumeC;
+    //    private int lastA, lastB, lastC;
+    private int audiotstates;
+    private int samplesPerFrame;
     private MachineTypes spectrumModel;
 
     AY8912() {
@@ -146,8 +165,8 @@ public final class AY8912 {
         }
 
         if (samplesPerFrame != 0) {
-            double tmp = (double)spectrumModel.tstatesFrame / (double)samplesPerFrame;
-            step = (long)(tmp * 100000.0);
+            double tmp = (double) spectrumModel.tstatesFrame / (double) samplesPerFrame;
+            step = (long) (tmp * 100000.0);
             stepRate = tmp / 16.0;
 //            System.out.println(String.format("step = %d, stepRate = %f", step, stepRate));
         }
@@ -166,8 +185,8 @@ public final class AY8912 {
         FREQ = freq;
         samplesPerFrame = FREQ / 50;
 
-        double tmp = (double)spectrumModel.tstatesFrame / (double)samplesPerFrame;
-        step = (long)(tmp * 100000.0);
+        double tmp = (double) spectrumModel.tstatesFrame / (double) samplesPerFrame;
+        step = (long) (tmp * 100000.0);
         stepRate = tmp / 16.0;
 
 //        System.out.println(String.format("step = %d, stepRate = %f", step, stepRate));
@@ -183,7 +202,7 @@ public final class AY8912 {
 
     public int readRegister() {
         if (addressLatch >= 14
-            && (regAY[Mixer] >> addressLatch - 8 & 1) == 0) {
+                && (regAY[Mixer] >> addressLatch - 8 & 1) == 0) {
 //            System.out.println(String.format("getAYRegister %d: %02X",
 //                registerLatch, 0xFF));
             return 0xFF;
@@ -256,10 +275,11 @@ public final class AY8912 {
             case CoarseEnvelope:
                 regAY[addressLatch] = value & 0xff;
                 envelopePeriod = (regAY[CoarseEnvelope] << 8) | regAY[FineEnvelope];
-                if (envelopePeriod == 0)
+                if (envelopePeriod == 0) {
                     envelopePeriod = 2;  // envelopePeriod = 1; envelopePeriod <<= 1;
-                else
+                } else {
                     envelopePeriod <<= 1;
+                }
 //                System.out.println(String.format("envPeriod: %d", envelopePeriod));
                 break;
             case EnvelopeShapeCycle:
@@ -268,7 +288,7 @@ public final class AY8912 {
                 Alternate = (value & ALTERNATE) != 0;
                 Attack = (value & ATTACK) != 0;
                 amplitudeEnv = Attack ? 0 : 15;
-                Continue = true;         
+                Continue = true;
                 envelopeCounter = 0;
 //                if (envA || envB || envC)
 //                    System.out.println(String.format("envShape: %02x, amplitudeEnv: %d", value & 0x0f, amplitudeEnv));
@@ -293,7 +313,7 @@ public final class AY8912 {
         }
     }
 
-//    private int ayClock;
+    //    private int ayClock;
     public void updateAY(int tstates) {
 
 //        System.out.println(String.format("updateAY: tstates = %d", tstates));
@@ -412,7 +432,7 @@ public final class AY8912 {
 //                System.out.println(String.format("> stepCounter = %f, percent = %f, volumeA = %f, ampA = %f",
 //                    stepCounter, percent, volumeA, amplitudeA));
             } else {
-                double percent = (double)diff / 1600000.0;
+                double percent = (double) diff / 1600000.0;
                 int lastA = 0, lastB = 0, lastC = 0;
                 if ((toneA || disableToneA) && (toneN || disableNoiseA)) {
                     lastA = (int) (amplitudeA * percent);
@@ -428,7 +448,7 @@ public final class AY8912 {
 
 //                System.out.println(String.format("< stepCounter = %f, percent = %f, volumeA = %f, lastA = %f",
 //                    stepCounter, percent, volumeA + lastA, lastA));
-                
+
                 stepCounter -= step;
                 bufA[pbuf] = (int) ((volumeA + lastA) / stepRate);
                 bufB[pbuf] = (int) ((volumeB + lastB) / stepRate);

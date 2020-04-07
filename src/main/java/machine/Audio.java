@@ -10,12 +10,21 @@
 package machine;
 
 import configuration.AY8912Type;
+
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.SourceDataLine;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.sound.sampled.*;
+
 
 class Audio {
+
+    private static final Logger LOG = Logger.getLogger(Audio.class.getName());
+
     private int samplingFrequency;
     private SourceDataLine line;
     private DataLine.Info infoDataLine;
@@ -27,28 +36,34 @@ class Audio {
     private final int[] ayBufA = new int[1024];
     private final int[] ayBufB = new int[1024];
     private final int[] ayBufC = new int[1024];
-    private int ptrBeeper, ptrBuf;
-    private int level, lastLevel;
+    private int ptrBeeper;
+    private int ptrBuf;
+    private int level;
+    private int lastLevel;
     private int audiotstates;
-    private int samplesPerFrame, frameSize;
-    private int soundMode, channels;
-    private long timeRem, step;
+    private int samplesPerFrame;
+    private int frameSize;
+    private int soundMode;
+    private int channels;
+    private long timeRem;
+    private long step;
     private MachineTypes spectrumModel;
     private boolean enabledAY;
     private final AY8912Type settings;
     private AY8912 ay;
 
     Audio(AY8912Type ayConf) {
-       settings = ayConf;
-       line = null;
+        settings = ayConf;
+        line = null;
     }
-    
+
     synchronized void open(MachineTypes model, AY8912 ay8912, boolean hasAY, int freq) {
         samplingFrequency = freq;
-        
+
         soundMode = settings.getSoundMode();
-        if (soundMode < 0 || soundMode > 3)
+        if (soundMode < 0 || 3 < soundMode) {
             soundMode = 0;
+        }
 
         channels = soundMode > 0 ? 2 : 1;
 
@@ -59,7 +74,7 @@ class Audio {
                 infoDataLine = new DataLine.Info(SourceDataLine.class, fmt);
                 line = (SourceDataLine) AudioSystem.getLine(infoDataLine);
             } catch (LineUnavailableException excpt) {
-                Logger.getLogger(Audio.class.getName()).log(Level.SEVERE, null, excpt);
+                LOG.log(Level.SEVERE, null, excpt);
             }
 
             enabledAY = hasAY;
@@ -74,10 +89,10 @@ class Audio {
                 ay8912.setSpectrumModel(spectrumModel);
             }
 
-            step = (long)(((double)spectrumModel.tstatesFrame / (double)samplesPerFrame) * 100000.0);
+            step = (long) (((double) spectrumModel.tstatesFrame / (double) samplesPerFrame) * 100000.0);
             audiotstates = ptrBeeper = ptrBuf = 0;
             level = lastLevel = 0;
-            
+
             ay8912.setMaxAmplitude(soundMode == 0 ? 10900 : 16350);
             switch (soundMode) {
                 case 2: // Stereo ACB
@@ -89,7 +104,7 @@ class Audio {
                 default: // Stereo ABC or Mono
                     ay8912.setBufferChannels(ayBufA, ayBufB, ayBufC);
             }
-            
+
             if (enabledAY) {
                 ay8912.setAudioFreq(samplingFrequency);
                 ay8912.startPlay();
@@ -109,7 +124,7 @@ class Audio {
                 }
                 line.start();
             } catch (LineUnavailableException ex) {
-                Logger.getLogger(Audio.class.getName()).log(Level.SEVERE, null, ex);
+                LOG.log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -162,44 +177,46 @@ class Audio {
         // para el próximo cambio de estado.
         timeRem = time;
         if (value != 0 && time > 0) {
-            level = (int)(((float) time / (float) step) * value);
+            level = (int) (((float) time / (float) step) * value);
         } else {
             level = 0;
         }
     }
-    
+
     synchronized public void flush() {
         level = lastLevel = ptrBeeper = 0;
         timeRem = 0;
-        if (line != null)
+        if (line != null) {
             line.flush();
+        }
     }
 
     synchronized public void sendAudioFrame() {
-        if (line != null)
+        if (line != null) {
             line.write(buf, 0, frameSize);
+        }
     }
 
     synchronized public void endFrame() {
 
-        if (ptrBeeper == 0)
+        if (ptrBeeper == 0) {
             return;
-                
+        }
+
 //        System.out.println(ptrBeeper + ", " + ay.getSampleCount());
 
         if (soundMode == 0) {
             endFrameMono();
-        }
-        else {
+        } else {
             endFrameStereo();
         }
 
         ptrBuf = 0;
-        
+
         if (enabledAY) {
             ay.endFrame();
         }
-        
+
         audiotstates = ptrBeeper = 0;
     }
 
@@ -212,7 +229,7 @@ class Audio {
             for (int idx = 0; idx < samplesPerFrame; idx++) {
                 int sample = beeper[idx] + ayBufA[idx] + ayBufB[idx] + ayBufC[idx];
                 buf[ptrBuf++] = (byte) sample;
-                buf[ptrBuf++] = (byte)(sample >>> 8);
+                buf[ptrBuf++] = (byte) (sample >>> 8);
             }
         } else {
             for (int idx = 0; idx < samplesPerFrame; idx++) {
@@ -231,15 +248,15 @@ class Audio {
         if (enabledAY) {
             int sampleL, sampleR, center, side;
             for (int idx = 0; idx < samplesPerFrame; idx++) {
-                center = (int)(ayBufB[idx] * 0.7);
-                side = (int)(ayBufC[idx] * 0.3);
+                center = (int) (ayBufB[idx] * 0.7);
+                side = (int) (ayBufC[idx] * 0.3);
                 sampleL = beeper[idx] + ayBufA[idx] + center + side;
-                side = (int)(ayBufA[idx] * 0.3);
+                side = (int) (ayBufA[idx] * 0.3);
                 sampleR = beeper[idx] + side + center + ayBufC[idx];
                 buf[ptrBuf++] = (byte) sampleL;
-                buf[ptrBuf++] = (byte)(sampleL >>> 8);
+                buf[ptrBuf++] = (byte) (sampleL >>> 8);
                 buf[ptrBuf++] = (byte) sampleR;
-                buf[ptrBuf++] = (byte)(sampleR >>> 8);
+                buf[ptrBuf++] = (byte) (sampleR >>> 8);
             }
         } else {
             byte lsb, msb;
@@ -258,7 +275,7 @@ class Audio {
         audiotstates = 0;
         level = lastLevel = ptrBeeper = 0;
         timeRem = 0;
-        Arrays.fill(buf, (byte)0);
+        Arrays.fill(buf, (byte) 0);
         Arrays.fill(beeper, 0);
     }
 }

@@ -1,17 +1,12 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package z80core;
 
 /**
- *
  * @author jsanchez
  */
 public class MemIoOps {
-    private byte z80Ram[] = null;
-    private byte z80Ports[] = null;
+
+    private byte[] z80Ram = null;
+    private byte[] z80Ports = null;
     private long tstates = 0;
 
     public MemIoOps() {
@@ -20,15 +15,17 @@ public class MemIoOps {
     }
 
     public MemIoOps(int ramSize, int portSize) {
-        if (ramSize < 0 || ramSize > 0x10000)
+        if (ramSize < 0 || ramSize > 0x10000) {
             throw new IndexOutOfBoundsException("ramSize Out of Range [0x0000 - 0x10000");
+        }
 
         if (ramSize > 0) {
             z80Ram = new byte[ramSize];
         }
 
-        if (portSize < 0 || portSize > 0x10000)
+        if (portSize < 0 || portSize > 0x10000) {
             throw new IndexOutOfBoundsException("portSize Out of Range [0x0000 - 0x10000");
+        }
 
         if (portSize > 0) {
             z80Ports = new byte[portSize];
@@ -56,7 +53,7 @@ public class MemIoOps {
 
     public void poke8(int address, int value) {
         tstates += 3; // 3 clocks for write byte to RAM
-        z80Ram[address] = (byte)value;
+        z80Ram[address] = (byte) value;
     }
 
     public int peek16(int address) {
@@ -77,7 +74,7 @@ public class MemIoOps {
 
     public void outPort(int port, int value) {
         tstates += 4; // 4 clocks for write byte to bus
-        z80Ports[port] = (byte)value;
+        z80Ports[port] = (byte) value;
     }
 
     public void addressOnBus(int address, int tstates) {

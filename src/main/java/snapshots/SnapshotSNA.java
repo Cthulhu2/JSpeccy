@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package snapshots;
 
 import java.io.BufferedInputStream;
@@ -13,26 +9,34 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import machine.Keyboard.JoystickModel;
 import machine.MachineTypes;
 import z80core.Z80.IntMode;
 
+
 /**
- *
  * @author jsanchez
  */
-public class SnapshotSNA implements SnapshotFile {
+public class SnapshotSNA
+        implements SnapshotFile {
+
+    private static final Logger LOG =
+            Logger.getLogger(SnapshotSNA.class.getName());
+
     private BufferedInputStream fIn;
     private BufferedOutputStream fOut;
     private SpectrumState spectrum;
     private Z80State z80;
     private MemoryState memory;
     private AY8912State ay8912;
-    
+
     @Override
-    public SpectrumState load(File filename) throws SnapshotException {
+    public SpectrumState load(File filename)
+            throws SnapshotException {
+
         spectrum = new SpectrumState();
-        
+
         try {
             try {
                 fIn = new BufferedInputStream(new FileInputStream(filename));
@@ -65,7 +69,7 @@ public class SnapshotSNA implements SnapshotFile {
 
             z80 = new Z80State();
             spectrum.setZ80State(z80);
-            
+
             z80.setRegI(snaHeader[0]);
             z80.setRegLx(snaHeader[1]);
             z80.setRegHx(snaHeader[2]);
@@ -107,12 +111,12 @@ public class SnapshotSNA implements SnapshotFile {
                     z80.setIM(IntMode.IM2);
                     break;
             }
-            
+
             spectrum.setBorder(snaHeader[26]);
 
             memory = new MemoryState();
             spectrum.setMemoryState(memory);
-            
+
             byte[] buffer = new byte[0x4000];
 
             // Cargamos la página de la pantalla 0x4000-0x7FFF (5)
@@ -220,8 +224,9 @@ public class SnapshotSNA implements SnapshotFile {
             throw new SnapshotException("FILE_READ_ERROR", ex);
         } finally {
             try {
-                if (fIn != null)
+                if (fIn != null) {
                     fIn.close();
+                }
             } catch (IOException ex) {
                 throw new SnapshotException("FILE_READ_ERROR", ex);
             }
@@ -231,7 +236,9 @@ public class SnapshotSNA implements SnapshotFile {
     }
 
     @Override
-    public boolean save(File filename, SpectrumState state) throws SnapshotException {
+    public boolean save(File filename, SpectrumState state)
+            throws SnapshotException {
+
         spectrum = state;
         z80 = spectrum.getZ80State();
         memory = spectrum.getMemoryState();
@@ -243,8 +250,8 @@ public class SnapshotSNA implements SnapshotFile {
         }
 
         // The SNA format can handle Spectrum 16/48k and 128k (not +2)
-        if (spectrum.getSpectrumModel().codeModel != MachineTypes.CodeModel.SPECTRUM48K &&
-                spectrum.getSpectrumModel() != MachineTypes.SPECTRUM128K) {
+        if (spectrum.getSpectrumModel().codeModel != MachineTypes.CodeModel.SPECTRUM48K
+                && spectrum.getSpectrumModel() != MachineTypes.SPECTRUM128K) {
             throw new SnapshotException("SNA_DONT_SUPPORT_PLUS3");
         }
 
@@ -275,8 +282,8 @@ public class SnapshotSNA implements SnapshotFile {
             snaHeader[16] = (byte) (z80.getRegIY() >>> 8);
             snaHeader[17] = (byte) z80.getRegIX();
             snaHeader[18] = (byte) (z80.getRegIX() >>> 8);
-            
-            snaHeader[19] = (byte) (z80.isIFF2() ?  0x04 : 0x00);
+
+            snaHeader[19] = (byte) (z80.isIFF2() ? 0x04 : 0x00);
 
             snaHeader[20] = (byte) z80.getRegR();
             snaHeader[21] = (byte) z80.getRegF();
@@ -300,7 +307,7 @@ public class SnapshotSNA implements SnapshotFile {
                 System.arraycopy(memory.getPageRam(5), 0, buffer, 0, 0x4000);
                 System.arraycopy(memory.getPageRam(2), 0, buffer, 0x4000, 0x4000);
                 System.arraycopy(memory.getPageRam(0), 0, buffer, 0x8000, 0x4000);
-                
+
                 regSP -= 0x4000;
                 buffer[regSP] = (byte) z80.getRegPC();
                 regSP = (regSP + 1) & 0xffff;
@@ -338,10 +345,11 @@ public class SnapshotSNA implements SnapshotFile {
             throw new SnapshotException("FILE_WRITE_ERROR", ex);
         } finally {
             try {
-                if (fOut != null)
+                if (fOut != null) {
                     fOut.close();
+                }
             } catch (IOException ex) {
-                Logger.getLogger(SnapshotSNA.class.getName()).log(Level.SEVERE, null, ex);
+                LOG.log(Level.SEVERE, null, ex);
             }
         }
         return true;

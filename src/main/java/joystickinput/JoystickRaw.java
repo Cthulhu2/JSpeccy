@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package joystickinput;
 
 import java.io.DataInputStream;
@@ -12,13 +8,18 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+
 /**
- *
  * @author jsanchez
  */
-public class JoystickRaw implements Runnable {
+public class JoystickRaw
+        implements Runnable {
+
+    private static final Logger LOG =
+            Logger.getLogger(JoystickRaw.class.getName());
 
     private static boolean helperLoaded;
+
     static {
         String libName = System.getProperty("os.arch").contains("amd64")
                 ? "JoystickHelper-64"
@@ -39,7 +40,7 @@ public class JoystickRaw implements Runnable {
     private static final int EVENT_BUFFER = 64;
     private static final int STRUCT_EVENT_SIZE = 8;
     private static final int JOYSTICK_BUFFER_SIZE = EVENT_BUFFER * STRUCT_EVENT_SIZE;
-    private byte eventBuffer[] = new byte[JOYSTICK_BUFFER_SIZE];
+    private byte[] eventBuffer = new byte[JOYSTICK_BUFFER_SIZE];
 
     private static final int TIMESTAMP_OFFSET = 0;
     private static final int VALUE_OFFSET = 4;
@@ -54,9 +55,9 @@ public class JoystickRaw implements Runnable {
 
     private static final int MAX_BUTTONS = 32;
     private static final int MAX_AXIS = 32;
-    private final boolean buttonState[] = new boolean[MAX_BUTTONS];
-    private final int buttonMasks[] = new int[MAX_BUTTONS];
-    private final short axisValue[] = new short[MAX_AXIS];
+    private final boolean[] buttonState = new boolean[MAX_BUTTONS];
+    private final int[] buttonMasks = new int[MAX_BUTTONS];
+    private final short[] axisValue = new short[MAX_AXIS];
     private int numButtons, numAxis, buttonMask, joystickId;
     private String joystickName;
 
@@ -66,7 +67,10 @@ public class JoystickRaw implements Runnable {
     private final ArrayList<JoystickRawListener> axisListeners;
 
     private String deviceName;
-    public JoystickRaw(int id) throws FileNotFoundException, IOException {
+
+    public JoystickRaw(int id)
+            throws FileNotFoundException {
+
         deviceName = "/dev/input/js" + id;
         joystickId = id;
         buttonListeners = new ArrayList<>();
@@ -80,8 +84,10 @@ public class JoystickRaw implements Runnable {
             numButtons = getNumButtonsHelper(id);
             numAxis = getNumAxisHelper(id);
             joystickName = toStringHelper(id);
-            System.out.println(String.format("From JNI: buttons %d, axis %d", numButtons, numAxis));
-            System.out.println(String.format("From JNI: joystick name: %s", joystickName));
+            System.out.println(String.format(
+                    "From JNI: buttons %d, axis %d", numButtons, numAxis));
+            System.out.println(String.format(
+                    "From JNI: joystick name: %s", joystickName));
         }
 
         if (!helperLoaded || numButtons == -1) {
@@ -93,8 +99,9 @@ public class JoystickRaw implements Runnable {
                     return;
                 }
             } catch (IOException ex) {
-//            Logger.getLogger(JoystickRaw.class.getName()).log(Level.SEVERE, null, ex);
-                throw new FileNotFoundException(String.format("Joystick device %s not found", deviceName));
+//            LOG.log(Level.SEVERE, null, ex);
+                throw new FileNotFoundException(String.format(
+                        "Joystick device %s not found", deviceName));
             }
 
             for (int idx = 0; idx < count; idx += STRUCT_EVENT_SIZE) {
@@ -132,7 +139,6 @@ public class JoystickRaw implements Runnable {
      * Adds a new event listener to the list of event listeners.
      *
      * @param listener The new event listener.
-     *
      * @throws NullPointerException Thrown if the listener argument is null.
      */
     public void addButtonListener(final JoystickRawListener listener) {
@@ -151,8 +157,7 @@ public class JoystickRaw implements Runnable {
      * Remove a new event listener from the list of event listeners.
      *
      * @param listener The event listener to remove.
-     *
-     * @throws NullPointerException Thrown if the listener argument is null.
+     * @throws NullPointerException     Thrown if the listener argument is null.
      * @throws IllegalArgumentException Thrown if the listener wasn't registered.
      */
     public void removeButtonListener(final JoystickRawListener listener) {
@@ -170,7 +175,6 @@ public class JoystickRaw implements Runnable {
      * Adds a new event listener to the list of event listeners.
      *
      * @param listener The new event listener.
-     *
      * @throws NullPointerException Thrown if the listener argument is null.
      */
     public void addAxisListener(final JoystickRawListener listener) {
@@ -189,8 +193,7 @@ public class JoystickRaw implements Runnable {
      * Remove a new event listener from the list of event listeners.
      *
      * @param listener The event listener to remove.
-     *
-     * @throws NullPointerException Thrown if the listener argument is null.
+     * @throws NullPointerException     Thrown if the listener argument is null.
      * @throws IllegalArgumentException Thrown if the listener wasn't registered.
      */
     public void removeAxisListener(final JoystickRawListener listener) {
@@ -227,10 +230,11 @@ public class JoystickRaw implements Runnable {
                             boolean state = eventBuffer[idx + VALUE_OFFSET] != 0;
                             synchronized (buttonState) {
                                 buttonState[number] = state;
-                                if (state)
+                                if (state) {
                                     buttonMask |= buttonMasks[number];
-                                else
+                                } else {
                                     buttonMask &= ~buttonMasks[number];
+                                }
                             }
 
                             if (type == JS_EVENT_BUTTON) {
@@ -242,7 +246,8 @@ public class JoystickRaw implements Runnable {
                         case JS_EVENT_AXIS:
                         case JS_EVENT_INIT_AXIS:
                             short value = (short)
-                                ((eventBuffer[idx + VALUE_OFFSET + 1] << 8) | (eventBuffer[idx + VALUE_OFFSET] & 0xff));
+                                    ((eventBuffer[idx + VALUE_OFFSET + 1] << 8)
+                                            | (eventBuffer[idx + VALUE_OFFSET] & 0xff));
 //                            System.out.println(String.format("Axis [%d] pressed. Value = [%d]", number, value));
                             synchronized (axisValue) {
                                 axisValue[number] = value;
@@ -261,13 +266,14 @@ public class JoystickRaw implements Runnable {
 
             }
         } catch (IOException ex) {
-            Logger.getLogger(JoystickRaw.class.getName()).log(Level.SEVERE, null, ex);
+            LOG.log(Level.SEVERE, null, ex);
         }
     }
 
     public void start() {
-        if (run)
+        if (run) {
             return;
+        }
 
         run = true;
         new Thread(this, "JoystickThread " + deviceName).start();
@@ -282,6 +288,7 @@ public class JoystickRaw implements Runnable {
             return buttonMask;
         }
     }
+
     /**
      * @param index
      * @return the buttonState
@@ -311,6 +318,7 @@ public class JoystickRaw implements Runnable {
     }
 
     private native int getNumButtonsHelper(int joystickId);
+
     /**
      * @return the numButtons
      */
@@ -319,6 +327,7 @@ public class JoystickRaw implements Runnable {
     }
 
     private native int getNumAxisHelper(int joystickId);
+
     /**
      * @return the numAxis
      */
@@ -327,10 +336,12 @@ public class JoystickRaw implements Runnable {
     }
 
     private native String toStringHelper(int joystickId);
+
     @Override
     public String toString() {
         return joystickName;
     }
+
     /**
      * @return the joystickId
      */

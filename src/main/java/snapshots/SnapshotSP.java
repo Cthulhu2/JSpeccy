@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package snapshots;
 
 import java.io.BufferedInputStream;
@@ -9,24 +5,28 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+
 import machine.Keyboard.JoystickModel;
 import machine.MachineTypes;
 import z80core.Z80.IntMode;
 
+
 /**
- *
  * @author jsanchez
  */
-public class SnapshotSP implements SnapshotFile {
+public class SnapshotSP
+        implements SnapshotFile {
+
     private BufferedInputStream fIn;
     private SpectrumState spectrum;
     private Z80State z80;
     private MemoryState memory;
-    
+
     @Override
-    public SpectrumState load(File filename) throws SnapshotException {
+    public SpectrumState load(File filename)
+            throws SnapshotException {
         spectrum = new SpectrumState();
-        
+
         try {
             try {
                 fIn = new BufferedInputStream(new FileInputStream(filename));
@@ -105,7 +105,7 @@ public class SnapshotSP implements SnapshotFile {
 
             memory = new MemoryState();
             spectrum.setMemoryState(memory);
-            
+
             byte[] buffer = new byte[0x4000];
 
             // Cargamos la página de la pantalla 0x4000-0x7FFF (5)
@@ -154,8 +154,9 @@ public class SnapshotSP implements SnapshotFile {
             throw new SnapshotException("FILE_READ_ERROR", ex);
         } finally {
             try {
-                if (fIn != null)
+                if (fIn != null) {
                     fIn.close();
+                }
             } catch (IOException ex) {
                 throw new SnapshotException("FILE_READ_ERROR", ex);
             }
@@ -165,7 +166,9 @@ public class SnapshotSP implements SnapshotFile {
     }
 
     @Override
-    public boolean save(File filename, SpectrumState state) throws SnapshotException {
+    public boolean save(File filename, SpectrumState state)
+            throws SnapshotException {
+
         throw new SnapshotException("FILE_WRITE_ERROR");
     }
 
