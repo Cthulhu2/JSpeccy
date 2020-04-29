@@ -26,7 +26,8 @@ import java.util.ResourceBundle;
  * @author jsanchez
  */
 public class MemoryBrowserDialog
-        extends javax.swing.JPanel {
+        extends javax.swing.JPanel
+        implements IHexViewListener {
 
     private JDialog memoryBrowserDialog;
     private JHexView hexView;
@@ -45,7 +46,7 @@ public class MemoryBrowserDialog
         hexView.setDefinitionStatus(DefinitionStatus.DEFINED);
         hexView.setBytesPerColumn(1);
         hexView.setEnabled(true);
-        hexView.addHexListener(new SelectionChangedListener());
+        hexView.addHexListener(this);
         hexViewPanel.add(hexView);
         ResourceBundle bundle = ResourceBundle.getBundle("gui/Bundle"); // NOI18N
         formatInfo = bundle.getString("MemoryBrowserDialog.informationLabel.txt");
@@ -62,33 +63,37 @@ public class MemoryBrowserDialog
         if (memoryBrowserDialog == null) {
             memoryBrowserDialog = new JDialog(owner, false);
             memoryBrowserDialog.setMinimumSize(new Dimension(30, 200));
+            // TODO: Fix JDialog maximum size for Windows
+            //   JDK-6464548 : Reopen 6383434: Frame.setMaximumSize() doesn't work
+            //   https://bugs.java.com/bugdatabase/view_bug.do?bug_id=6464548
             memoryBrowserDialog.setMaximumSize(new Dimension(520, 800));
             memoryBrowserDialog.getContentPane().add(this);
             memoryBrowserDialog.pack();
             memoryBrowserDialog.setLocationRelativeTo(parent);
         }
 
-        if (spectrumModel != memory.getSpectrumModel()) {
-            spectrumModel = memory.getSpectrumModel();
-            memoryComboBox.setEnabled(memory.isModel128k());
-            memoryComboBox.setSelectedIndex(0);
-            memory.setPageModeBrowser(8);
-            hexView.setData(memory.getMemoryDataProvider());
-            gotoAddress.setModel(new javax.swing.SpinnerNumberModel(0, 0, 65535, 16));
-            if (markPrintableCharacters.isSelected()) {
-                SwingUtilities.invokeLater(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        markPrintableCharacters();
-                    }
-                });
-            }
-        }
+        updateHexView();
 
         memoryBrowserDialog.setTitle(title);
         memoryBrowserDialog.setVisible(true);
         return true;
+    }
+
+    private void updateHexView() {
+        if (spectrumModel == memory.getSpectrumModel()) {
+            return;
+        }
+
+        spectrumModel = memory.getSpectrumModel();
+        memoryComboBox.setEnabled(memory.isModel128k());
+        memoryComboBox.setSelectedIndex(0);
+        memory.setPageModeBrowser(8);
+        hexView.setData(memory.getMemoryDataProvider());
+        gotoAddress.setModel(new SpinnerNumberModel(0, 0, 65535, 16));
+
+        if (markPrintableCharacters.isSelected()) {
+            SwingUtilities.invokeLater(this::markPrintableCharacters);
+        }
     }
 
     /**
@@ -260,30 +265,22 @@ public class MemoryBrowserDialog
         hexView.setData(memory.getMemoryDataProvider());
         hexView.setDefinitionStatus(DefinitionStatus.DEFINED);
         if (markPrintableCharacters.isSelected()) {
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-                    markPrintableCharacters();
-                }
-            });
+            SwingUtilities.invokeLater(this::markPrintableCharacters);
         }
     }//GEN-LAST:event_memoryComboBoxActionPerformed
 
     private void addressLabelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_addressLabelMouseClicked
-        hexView.setAddressMode(hexView.getAddressMode() == JHexView.AddressMode.HEXADECIMAL
-                ? JHexView.AddressMode.DECIMAL : JHexView.AddressMode.HEXADECIMAL);
+        JHexView.AddressMode mode =
+                hexView.getAddressMode() == JHexView.AddressMode.HEXADECIMAL
+                        ? JHexView.AddressMode.DECIMAL
+                        : JHexView.AddressMode.HEXADECIMAL;
+
+        hexView.setAddressMode(mode);
     }//GEN-LAST:event_addressLabelMouseClicked
 
     private void markPrintableCharactersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_markPrintableCharactersActionPerformed
         if (markPrintableCharacters.isSelected()) {
-            SwingUtilities.invokeLater(new Runnable() {
-
-                @Override
-                public void run() {
-                    markPrintableCharacters();
-                }
-            });
+            SwingUtilities.invokeLater(this::markPrintableCharacters);
         } else {
             hexView.uncolorizeAll(0);
         }
@@ -348,43 +345,28 @@ public class MemoryBrowserDialog
         }
     }
 
-    private class SelectionChangedListener
-            implements IHexViewListener {
+    //<editor-fold desc=" IHexViewListener implementation ">
+    @Override
+    public void selectionChanged(long start, long length) {
 
-        @Override
-        public void selectionChanged(long start, long length) {
+        updateHexView();
 
-            if (spectrumModel != memory.getSpectrumModel()) {
-                spectrumModel = memory.getSpectrumModel();
-                memoryComboBox.setEnabled(memory.isModel128k());
-                memoryComboBox.setSelectedIndex(0);
-                memory.setPageModeBrowser(8);
-                hexView.setData(memory.getMemoryDataProvider());
-                gotoAddress.setModel(new javax.swing.SpinnerNumberModel(0, 0, 65535, 16));
-                if (markPrintableCharacters.isSelected()) {
-                    SwingUtilities.invokeLater(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            markPrintableCharacters();
-                        }
-                    });
-                }
-            }
-
-            if (length == 1) {
-                int address = (int) (start / 2) & 0xffff;
-                int value;
-
-                if (memoryComboBox.getSelectedIndex() == 0) {
-                    value = memory.readByte(address) & 0xff;
-                } else {
-                    value = memory.readByte(memoryComboBox.getSelectedIndex() - 1, address) & 0xff;
-                }
-
-                informationLabel.setText(String.format(formatInfo, address, address, value, value));
-                gotoAddress.getModel().setValue(address);
-            }
+        if (length != 1) {
+            return; // show an one cell info only
         }
+
+        int address = (int) (start / 2) & 0xffff;
+        int value;
+
+        int selMemRangeIdx = memoryComboBox.getSelectedIndex();
+        if (selMemRangeIdx == 0) { // 0x0000-0xFFFF
+            value = memory.readByte(address) & 0xff;
+        } else { // RAM 0-7
+            value = memory.readByte(selMemRangeIdx - 1, address) & 0xff;
+        }
+
+        informationLabel.setText(String.format(formatInfo, address, value));
+        gotoAddress.getModel().setValue(address);
     }
+    //</editor-fold>
 }

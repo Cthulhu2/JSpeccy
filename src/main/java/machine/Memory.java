@@ -1261,7 +1261,7 @@ public final class Memory {
 
         @Override
         public byte[] getData() {
-            byte ram[];
+            byte[] ram;
 
             if (pageModeBrowser > 7) {
                 ram = new byte[0x10000];
@@ -1284,7 +1284,7 @@ public final class Memory {
 
         @Override
         public byte[] getData(long offset, int length) {
-            byte ram[] = new byte[length];
+            byte[] ram = new byte[length];
 
             if (pageModeBrowser > 7) {
                 for (int addr = 0; addr < length; addr++) {
