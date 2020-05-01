@@ -21,9 +21,10 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,7 +44,7 @@ public class LoadSaveMemoryDialog
 
     private JDialog loadSaveMemoryDialog;
     private JFileChooser fileDlg;
-    FileNameExtensionFilter binExtension;
+    private FileNameExtensionFilter binExtension;
     private Memory memory;
     private File filename;
     private boolean saveDialog;
@@ -305,51 +306,38 @@ public class LoadSaveMemoryDialog
             return;
         }
 
+        int selMemRangeIdx = rangeCombobox.getSelectedIndex();
         if (saveDialog) {
-            BufferedOutputStream fOut = null;
-            try {
-                fOut = new BufferedOutputStream(new FileOutputStream(filename));
+            try (OutputStream fOut = new BufferedOutputStream(
+                    new FileOutputStream(filename))) {
 
-                if (rangeCombobox.getSelectedIndex() == 0) {
-                    // Range 0x0000-0xFFFF
+                if (selMemRangeIdx == 0) { // Range 0x0000-0xFFFF
                     for (int addr = start; addr < start + size; addr++) {
                         fOut.write(memory.readByte(addr));
                     }
-                } else {
-                    // Page Range
+                } else { // Page Range
                     for (int addr = start; addr < start + size; addr++) {
-                        fOut.write(memory.readByte(rangeCombobox.getSelectedIndex() - 1, addr));
+                        fOut.write(memory.readByte(selMemRangeIdx - 1, addr));
                     }
                 }
                 JOptionPane.showMessageDialog(this,
                         bundle.getString("SAVE_BINARY_OK"),
                         bundle.getString("SAVE_BINARY_OK_TITLE"),
                         JOptionPane.INFORMATION_MESSAGE);
-            } catch (IOException ioExcpt) {
-                LOG.log(Level.SEVERE, null, ioExcpt);
-            } finally {
-                try {
-                    if (fOut != null) {
-                        fOut.close();
-                    }
-                } catch (IOException ex) {
-                    LOG.log(Level.SEVERE, null, ex);
-                }
+            } catch (IOException ex) {
+                LOG.log(Level.SEVERE, null, ex);
             }
-            return;
         } else {
-            BufferedInputStream fIn = null;
-            try {
-                fIn = new BufferedInputStream(new FileInputStream(filename));
-                if (rangeCombobox.getSelectedIndex() == 0) {
-                    // Range 0x0000-0xFFFF
+            try (InputStream fIn = new BufferedInputStream(
+                    new FileInputStream(filename))) {
+
+                if (selMemRangeIdx == 0) { // Range 0x0000-0xFFFF
                     for (int addr = start; addr < start + size; addr++) {
                         memory.writeByte(addr, (byte) (fIn.read() & 0xff));
                     }
-                } else {
-                    // Page Range
+                } else { // Page Range
                     for (int addr = start; addr < start + size; addr++) {
-                        memory.writeByte(rangeCombobox.getSelectedIndex() - 1,
+                        memory.writeByte(selMemRangeIdx - 1,
                                 addr, (byte) (fIn.read() & 0xff));
                     }
                 }
@@ -359,14 +347,6 @@ public class LoadSaveMemoryDialog
                         JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException ex) {
                 LOG.log(Level.SEVERE, null, ex);
-            } finally {
-                try {
-                    if (fIn != null) {
-                        fIn.close();
-                    }
-                } catch (IOException ex) {
-                    LOG.log(Level.SEVERE, null, ex);
-                }
             }
         }
     }//GEN-LAST:event_loadSaveButtonActionPerformed

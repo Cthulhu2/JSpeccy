@@ -12,12 +12,18 @@ import javax.swing.JOptionPane;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.xml.bind.JAXB;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
 import java.awt.Component;
 import java.awt.Frame;
 import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,6 +37,9 @@ public class SettingsDialog
 
     private static final Logger LOG =
             Logger.getLogger(SettingsDialog.class.getName());
+
+    public static final File SETTINGS_FILE =
+            new File(System.getProperty("user.home") + "/JSpeccy.xml");
 
     private final ResourceBundle bundle =
             ResourceBundle.getBundle("gui/Bundle"); // NOI18N
@@ -144,6 +153,32 @@ public class SettingsDialog
         settingsDialog.setTitle(title);
         settingsDialog.setVisible(true);
         return true;
+    }
+
+    public static JSpeccySettings load(File file)
+            throws FileNotFoundException, JAXBException {
+
+        // create a JAXBContext capable of handling classes generated into
+        // the configuration package
+        JAXBContext jc = JAXBContext.newInstance("configuration");
+
+        // create an Unmarshaller
+        Unmarshaller unmsh = jc.createUnmarshaller();
+
+        // unmarshal a po instance document into a tree of Java content
+        // objects composed of classes from the configuration package.
+        return (JSpeccySettings) unmsh.unmarshal(new FileInputStream(file));
+    }
+
+    public static void save(JSpeccySettings settings, File file) {
+        try (OutputStream fOut = new BufferedOutputStream(
+                new FileOutputStream(file))) {
+
+            // create a Marshaller and marshal to conf. file
+            JAXB.marshal(settings, fOut);
+        } catch (IOException ex) {
+            LOG.log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -800,23 +835,7 @@ public class SettingsDialog
             }
         }
 
-        try {
-            BufferedOutputStream fOut = new BufferedOutputStream(
-                    new FileOutputStream(System.getProperty("user.home") + "/JSpeccy.xml"));
-            // create an element for marshalling
-//            JAXBElement<JSpeccySettingsType> confElement =
-//                (new ObjectFactory()).createJSpeccySettings(settings);
-
-            // create a Marshaller and marshal to conf. file
-            JAXB.marshal(settings, fOut);
-            try {
-                fOut.close();
-            } catch (IOException ex) {
-                LOG.log(Level.SEVERE, null, ex);
-            }
-        } catch (FileNotFoundException ex) {
-            LOG.log(Level.SEVERE, null, ex);
-        }
+        save(settings, SETTINGS_FILE);
     }//GEN-LAST:event_saveSettingsButtonActionPerformed
 
     private void soundMutedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_soundMutedActionPerformed

@@ -36,10 +36,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.plaf.basic.BasicFileChooserUI;
 import javax.swing.plaf.metal.MetalLookAndFeel;
-import javax.xml.bind.JAXB;
-import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.RenderingHints;
@@ -50,11 +47,11 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.List;
@@ -467,43 +464,28 @@ public class JSpeccy
     }
 
     private void verifyConfigFile(boolean deleteFile) {
-        File file = new File(System.getProperty("user.home") + "/JSpeccy.xml");
-        if (file.exists() && !deleteFile) {
+        if (SettingsDialog.SETTINGS_FILE.exists() && !deleteFile) {
             return;
         }
 
         if (deleteFile) {
-            if (!file.delete()) {
+            if (!SettingsDialog.SETTINGS_FILE.delete()) {
                 System.out.println("Can't delete the bad JSpeccy.xml");
             }
         }
 
         // Si el archivo de configuración no existe, lo crea de nuevo en el
         // directorio actual copiándolo del bueno que hay siempre en el .jar
-        InputStream input = null;
-        BufferedOutputStream output = null;
-        try {
-            input = Spectrum.class.getResourceAsStream("/schema/JSpeccy.xml");
-            output = new BufferedOutputStream(
-                    new FileOutputStream(System.getProperty("user.home") + "/JSpeccy.xml"));
+        try (InputStream input = Spectrum.class
+                .getResourceAsStream("/schema/JSpeccy.xml");
+             OutputStream output = new BufferedOutputStream(
+                     new FileOutputStream(SettingsDialog.SETTINGS_FILE))) {
 
             byte[] fileConf = new byte[input.available()];
             input.read(fileConf);
             output.write(fileConf, 0, fileConf.length);
         } catch (IOException ioExcpt) {
             LOG.log(Level.SEVERE, null, ioExcpt);
-        } finally {
-            try {
-                if (input != null) {
-                    input.close();
-                }
-
-                if (output != null) {
-                    output.close();
-                }
-            } catch (IOException ex) {
-                LOG.log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -512,17 +494,7 @@ public class JSpeccy
 
         boolean readed = true;
         try {
-            // create a JAXBContext capable of handling classes generated into
-            // the configuration package
-            JAXBContext jc = JAXBContext.newInstance("configuration");
-
-            // create an Unmarshaller
-            Unmarshaller unmsh = jc.createUnmarshaller();
-
-            // unmarshal a po instance document into a tree of Java content
-            // objects composed of classes from the configuration package.
-            settings = (JSpeccySettings) unmsh.unmarshal(new FileInputStream(
-                    System.getProperty("user.home") + "/JSpeccy.xml"));
+            settings = SettingsDialog.load(SettingsDialog.SETTINGS_FILE);
         } catch (JAXBException jexcpt) {
             System.out.println("Something during unmarshalling go very bad!");
             readed = false;
@@ -538,41 +510,20 @@ public class JSpeccy
 
         verifyConfigFile(true);
         try {
-            // create a JAXBContext capable of handling classes generated into
-            // the configuration package
-            JAXBContext jc = JAXBContext.newInstance("configuration");
-
-            // create an Unmarshaller
-            Unmarshaller unmsh = jc.createUnmarshaller();
-
-            // unmarshal a po instance document into a tree of Java content
-            // objects composed of classes from the configuration package.
-            settings = (JSpeccySettings) unmsh.unmarshal(new FileInputStream(
-                    System.getProperty("user.home") + "/JSpeccy.xml"));
+            settings = SettingsDialog.load(SettingsDialog.SETTINGS_FILE);
         } catch (JAXBException jexcpt) {
             System.out.println("Something go very very badly with unmarshalling!");
         } catch (FileNotFoundException ioexcpt) {
             System.out.println("Can't open the JSpeccy.xml configuration file anyway");
             System.exit(0);
         }
-
     }
 
     private void saveRecentFiles() {
         JSpeccySettings toSave = null;
         if (!settings.getEmulatorSettings().isAutosaveConfigOnExit()) {
             try {
-                // create a JAXBContext capable of handling classes generated into
-                // the configuration package
-                JAXBContext jc = JAXBContext.newInstance("configuration");
-
-                // create an Unmarshaller
-                Unmarshaller unmsh = jc.createUnmarshaller();
-
-                // unmarshal a po instance document into a tree of Java content
-                // objects composed of classes from the configuration package.
-                toSave = (JSpeccySettings) unmsh.unmarshal(new FileInputStream(
-                        System.getProperty("user.home") + "/JSpeccy.xml"));
+                toSave = SettingsDialog.load(SettingsDialog.SETTINGS_FILE);
             } catch (JAXBException jexcpt) {
                 System.out.println("Something during unmarshalling go very bad!");
             } catch (FileNotFoundException ioexcpt) {
@@ -625,19 +576,7 @@ public class JSpeccy
             toSave.getSpectrumSettings().setZoomed(jscr.isZoomed());
         }
 
-        try {
-            BufferedOutputStream fOut = new BufferedOutputStream(
-                    new FileOutputStream(System.getProperty("user.home") + "/JSpeccy.xml"));
-            // create a Marshaller and marshal to conf. file
-            JAXB.marshal(toSave, fOut);
-            try {
-                fOut.close();
-            } catch (IOException ex) {
-                LOG.log(Level.SEVERE, null, ex);
-            }
-        } catch (FileNotFoundException ex) {
-            LOG.log(Level.SEVERE, null, ex);
-        }
+        SettingsDialog.save(toSave, SettingsDialog.SETTINGS_FILE);
     }
 
     private void initEmulator() {
@@ -2864,56 +2803,57 @@ public class JSpeccy
                     bundle.getString("RECENT_FILE_ERROR"),
                     bundle.getString("RECENT_FILE_ERROR_TITLE"),
                     JOptionPane.ERROR_MESSAGE);
-        } else {
-            if (snapshotExtension.accept(fdopen)) {
+            return; //
+        }
 
-                stopEmulation();
+        if (snapshotExtension.accept(fdopen)) {
 
-                currentFileSnapshot = fdopen;
-                try {
-                    SnapshotFile snap = SnapshotFactory.getSnapshot(currentFileSnapshot);
-                    SpectrumState snapState = snap.load(currentFileSnapshot);
-                    if (snap instanceof SnapshotSZX) {
-                        SnapshotSZX snapSZX = (SnapshotSZX) snap;
-                        if (snapSZX.isTapeEmbedded()) {
+            stopEmulation();
+
+            currentFileSnapshot = fdopen;
+            try {
+                SnapshotFile snap = SnapshotFactory.getSnapshot(currentFileSnapshot);
+                SpectrumState snapState = snap.load(currentFileSnapshot);
+                if (snap instanceof SnapshotSZX) {
+                    SnapshotSZX snapSZX = (SnapshotSZX) snap;
+                    if (snapSZX.isTapeEmbedded()) {
+                        tape.eject();
+                        tape.insertEmbeddedTape(snapSZX.getTapeName(), snapSZX.getTapeExtension(),
+                                snapSZX.getTapeData(), snapSZX.getTapeBlock());
+                    }
+
+                    if (snapSZX.isTapeLinked()) {
+                        File tapeLink = new File(snapSZX.getTapeName());
+
+                        if (tapeLink.exists()) {
                             tape.eject();
-                            tape.insertEmbeddedTape(snapSZX.getTapeName(), snapSZX.getTapeExtension(),
-                                    snapSZX.getTapeData(), snapSZX.getTapeBlock());
-                        }
-
-                        if (snapSZX.isTapeLinked()) {
-                            File tapeLink = new File(snapSZX.getTapeName());
-
-                            if (tapeLink.exists()) {
-                                tape.eject();
-                                tape.insert(tapeLink);
-                                tape.setSelectedBlock(snapSZX.getTapeBlock());
-                            }
+                            tape.insert(tapeLink);
+                            tape.setSelectedBlock(snapSZX.getTapeBlock());
                         }
                     }
-                    spectrum.setSpectrumState(snapState);
-                } catch (SnapshotException excpt) {
-                    JOptionPane.showMessageDialog(this,
-                            bundle.getString(excpt.getMessage()),
-                            bundle.getString("SNAPSHOT_LOAD_ERROR"),
-                            JOptionPane.ERROR_MESSAGE);
                 }
+                spectrum.setSpectrumState(snapState);
+            } catch (SnapshotException excpt) {
+                JOptionPane.showMessageDialog(this,
+                        bundle.getString(excpt.getMessage()),
+                        bundle.getString("SNAPSHOT_LOAD_ERROR"),
+                        JOptionPane.ERROR_MESSAGE);
+            }
 
-                startEmulation();
+            startEmulation();
 
+        } else {
+            tape.eject();
+            currentFileTape = fdopen;
+
+            if (!tape.insert(currentFileTape)) {
+                JOptionPane.showMessageDialog(this,
+                        bundle.getString("LOAD_TAPE_ERROR"),
+                        bundle.getString("LOAD_TAPE_ERROR_TITLE"),
+                        JOptionPane.ERROR_MESSAGE);
             } else {
-                tape.eject();
-                currentFileTape = fdopen;
-
-                if (!tape.insert(currentFileTape)) {
-                    JOptionPane.showMessageDialog(this,
-                            bundle.getString("LOAD_TAPE_ERROR"),
-                            bundle.getString("LOAD_TAPE_ERROR_TITLE"),
-                            JOptionPane.ERROR_MESSAGE);
-                } else {
-                    if (settings.getTapeSettings().isAutoLoadTape()) {
-                        spectrum.autoLoadTape();
-                    }
+                if (settings.getTapeSettings().isAutoLoadTape()) {
+                    spectrum.autoLoadTape();
                 }
             }
         }
